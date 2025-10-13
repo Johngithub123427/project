@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Racer - Fade/Highlight Letters</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#1a1a1a,#121212);
+    color:#fff; margin:0; padding:0;
+}
+.container {
+    max-width:1000px; margin:20px auto; padding:20px;
+    background-color: rgba(30,30,30,0.95); border-radius:12px;
+    box-shadow:0 0 20px #000; text-align:center; position:relative;
+}
+.words {
+    font-size:28px; line-height:2;
+    display:flex; flex-wrap:wrap; max-height:300px; overflow-y:auto;
+    text-align:left; border:1px solid #333; padding:10px; border-radius:8px;
+}
+.word { margin-right:12px; display:inline-block; }
+.letter { color:#777; transition: color 0.1s; } /* faded by default */
+.correct { color:#fff !important; } /* bright when correct */
+.current-word { text-decoration:underline; }
+.current-char { text-decoration:underline; }
+#userInput { width:90%; padding:12px; font-size:22px; margin-top:10px; }
+.stats { margin-top:10px; font-size:22px; font-weight:bold; }
+.buttons { margin-top:15px; }
+.buttons button { padding:5px 10px; margin-right:5px; cursor:pointer; }
+.summary-overlay {
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    background-color: rgba(30,30,30,0.98);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    font-size:26px; border-radius:12px; color:#fff;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>Typing Racer</h1>
+<label for="wordCount">Words: </label>
+<select id="wordCount">
+    <option value="15">15</option>
+    <option value="30">30</option>
+    <option value="45">45</option>
+</select>
+<div class="words" id="wordDisplay"></div>
+<input type="text" id="userInput" placeholder="Start typing..." autocomplete="off">
+<div class="stats" id="stats">WPM: 0 | Accuracy: 100%</div>
+<div class="buttons">
+    <button id="restartBtn">Play Again / Restart</button>
+</div>
+<div class="summary-overlay" id="summary" style="display:none;"></div>
+</div>
+
+<script>
+const wordPool=[
+"apple","banana","orange","grape","cherry","strawberry","melon","kiwi","peach","mango",
+"pear","plum","pineapple","blueberry","raspberry","apricot","coconut","fig","lemon","lime",
+"papaya","watermelon","nectarine","pomegranate","guava","date","blackberry","cranberry","tangerine","passionfruit"
+];
+
+let words=[], currentIndex=0, typedWordsCount=0;
+let totalChars=0, correctChars=0, startTime, finished=false;
+let lastTypedWord="";
+
+const wordDisplay=document.getElementById("wordDisplay");
+const userInput=document.getElementById("userInput");
+const stats=document.getElementById("stats");
+const restartBtn=document.getElementById("restartBtn");
+const summary=document.getElementById("summary");
+const wordCountSelect=document.getElementById("wordCount");
+
+function generateWords(count){
+    words=[];
+    for(let i=0;i<count;i++){
+        words.push(wordPool[Math.floor(Math.random()*wordPool.length)]);
+    }
+    displayWords();
+    currentIndex=typedWordsCount=totalChars=correctChars=0;
+    finished=false;
+    lastTypedWord="";
+    startTime=new Date();
+    userInput.value="";
+    stats.textContent="WPM: 0 | Accuracy: 100%";
+    summary.style.display="none";
+    scrollCurrentWord();
+}
+
+function displayWords(){
+    wordDisplay.innerHTML="";
+    words.forEach((word,i)=>{
+        const span=document.createElement("span");
+        span.classList.add("word");
+        // add individual letters
+        for(let ch of word){
+            const letterSpan=document.createElement("span");
+            letterSpan.textContent=ch;
+            letterSpan.classList.add("letter");
+            span.appendChild(letterSpan);
+        }
+        span.appendChild(document.createTextNode(" ")); // space after word
+        if(i===currentIndex) span.classList.add("current-word");
+        wordDisplay.appendChild(span);
+    });
+}
+
+function updateDisplay(){
+    const typed=userInput.value;
+    const currentWordSpan=wordDisplay.children[currentIndex];
+    const letters=currentWordSpan.querySelectorAll(".letter");
+    const currentWord=words[currentIndex];
+
+    letters.forEach((span,i)=>{
+        span.classList.remove("correct");
+        if(typed[i] && typed[i]===currentWord[i]) span.classList.add("correct");
+    });
+}
+
+function scrollCurrentWord(){
+    const span=wordDisplay.children[currentIndex];
+    span.scrollIntoView({behavior:"smooth", block:"nearest", inline:"center"});
+}
+
+function calculateWPM(){
+    const minutes=(new Date()-startTime)/1000/60;
+    return Math.round(typedWordsCount/minutes);
+}
+
+function calculateAccuracy(){
+    return totalChars===0?100:Math.round(correctChars/totalChars*100);
+}
+
+userInput.addEventListener("input", ()=>{
+    if(finished) return;
+    let typed=userInput.value;
+    const currentWord=words[currentIndex];
+
+    // track correct characters
+    totalChars=totalChars-correctChars;
+    correctChars=0;
+    for(let i=0;i<typed.length;i++){
+        if(typed[i]===currentWord[i]) correctChars++;
+    }
+    totalChars+=typed.length;
+
+    updateDisplay();
+
+    if(typed.endsWith(" ")){
+        typedWordsCount++;
+        lastTypedWord=currentWord;
+        currentIndex++;
+        userInput.value="";
+        if(currentIndex>=words.length){
+            finished=true;
+            showSummary();
+            return;
+        }
+        scrollCurrentWord();
+    }
+
+    stats.textContent=`WPM: ${calculateWPM()} | Accuracy: ${calculateAccuracy()}%`;
+});
+
+// backspace logic for last typed word only
+userInput.addEventListener("keydown", e=>{
+    if(e.key==="Backspace" && userInput.value==="" && lastTypedWord!==""){
+        currentIndex--;
+        userInput.value=lastTypedWord;
+        lastTypedWord="";
+        scrollCurrentWord();
+        e.preventDefault();
+    }
+    if(e.key==="Tab" && finished){
+        e.preventDefault();
+        generateWords(Number(wordCountSelect.value));
+    }
+});
+
+function showSummary(){
+    summary.innerHTML=`<h2>Race Finished!</h2>
+    <p>WPM: ${calculateWPM()}</p>
+    <p>Accuracy: ${calculateAccuracy()}%</p>
+    <p>Press Play Again button or Tab key to restart</p>`;
+    summary.style.display="flex";
+}
+
+restartBtn.addEventListener("click", ()=>generateWords(Number(wordCountSelect.value)));
+wordCountSelect.addEventListener("change", ()=>generateWords(Number(wordCountSelect.value)));
+
+generateWords(Number(wordCountSelect.value));
+</script>
+
+</body>
+</html>
